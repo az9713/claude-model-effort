@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Claude Code: the (model, effort) grid</title>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--tx:#e2e8f0;--tx2:#cbd5e1;--mut:#94a3b8;--a1:#fb923c;--a2:#2dd4bf;--bd:#334155}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,Segoe UI,sans-serif;padding:28px 20px 60px}
+  main{max-width:1500px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 6px}
+  h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:32px 0 10px}
+  p{color:var(--tx2);margin:6px 0;max-width:900px}
+  a{color:var(--a2)}
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;max-width:900px;margin-top:12px}
+  .q{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 14px;color:var(--tx2);font-size:14px}
+  .q b{color:var(--a1)}
+  /* overview matrix */
+  table{border-collapse:separate;border-spacing:6px;width:100%}
+  th{font-weight:600;text-align:center;font-size:13px;padding:4px}
+  th.rowh{text-align:left;min-width:150px}
+  th small{display:block;color:var(--mut);font-weight:400;font-size:11.5px}
+  td a{display:block;text-decoration:none;color:var(--tx);border-radius:8px;padding:10px 8px;text-align:center;border:1px solid transparent;min-height:62px}
+  td a:hover{border-color:var(--tx)}
+  #matrix.has-sel td a{opacity:.28}
+  #matrix.has-sel td a.sel{opacity:1;outline:3px solid var(--a1);outline-offset:2px}
+  #detail{margin:14px 0 4px;scroll-margin-top:12px}
+  #detail .hint{border:1px dashed var(--bd);border-radius:10px;padding:16px;text-align:center;color:var(--mut)}
+  #detail .card{border-color:var(--a1);border-top-width:6px;padding:18px 22px;max-width:900px;font-size:15px}
+  #detail .card h4{font-size:19px}
+  #detail .card ul,#detail .watch{font-size:15px}
+  .figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+  figure{margin:0}
+  figure svg{width:100%;height:auto;display:block}
+  figcaption{font-size:12.5px;color:var(--mut);margin-top:6px}
+  .fe{font:600 12px system-ui;letter-spacing:.08em}
+  .ft{font:700 22px system-ui;fill:#e2e8f0}
+  .fl{font:700 14px ui-monospace,Consolas,monospace;fill:#0f172a;text-anchor:middle}
+  .fh{font:600 17px system-ui;fill:#e2e8f0}
+  .fs{font:400 12.5px system-ui;fill:#94a3b8}
+  .fm{font:400 18px ui-monospace,Consolas,monospace}
+  .fn{font:700 16px system-ui;fill:#e2e8f0;text-anchor:middle}
+  .step rect{fill:#0f172a;stroke:#334155;transition:all .3s}
+  .step circle{fill:#334155;transition:all .3s}
+  .step .fh{fill:#64748b;transition:fill .3s}
+  .step.on rect{stroke:#facc15;fill:#1b2336}
+  .step.on circle{fill:#facc15}
+  .step.on .fn{fill:#0f172a}
+  .step.on .fh{fill:#e2e8f0}
+  a.src{color:var(--a2);text-decoration:underline dotted;text-underline-offset:2px}
+  a.src:hover{color:var(--a1)}
+  .when{margin:6px 0 2px;padding:8px 12px;border-left:3px solid #fcd34d;background:#2a2412;border-radius:4px;color:var(--tx);font-size:14.5px}
+  .when b{color:#fcd34d}
+  #detail .mf{color:var(--mut);font-size:13px;margin:0 0 10px;max-width:900px}
+  #detail button{background:none;border:1px solid var(--bd);color:var(--a2);border-radius:6px;padding:4px 10px;cursor:pointer;margin-top:10px}
+  td a b{display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+  td a span{font-size:12px;color:var(--tx2)}
+  .v-sweet{background:#134e4a}.v-sweet b{color:#5eead4}
+  .v-useful{background:#1e3a5f}.v-useful b{color:#93c5fd}
+  .v-situ{background:#4a3410}.v-situ b{color:#fcd34d}
+  .v-unp{background:#1e293b;border-color:#475569!important}.v-unp b{color:#94a3b8}
+  /* model sections */
+  .model{margin-top:28px}
+  .model>header{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;border-bottom:1px solid var(--bd);padding-bottom:8px;margin-bottom:12px}
+  .model h3{margin:0;font-size:19px;color:var(--a2)}
+  .model header span{color:var(--mut);font-size:13px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:12px}
+  .card{background:var(--card);border:1px solid var(--bd);border-top:4px solid var(--c);border-radius:10px;padding:12px 14px;scroll-margin-top:12px}
+  .card:target{outline:2px solid var(--a1)}
+  .card h4{margin:0;font-size:15px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .card h4 .e{color:var(--c);text-transform:uppercase;letter-spacing:.06em}
+  .badge{font-size:11px;padding:2px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  .badge.v-sweet{color:#5eead4}.badge.v-useful{color:#93c5fd}.badge.v-situ{color:#fcd34d}.badge.v-unp{color:#94a3b8}
+  .use{margin:8px 0 4px;font-weight:600;color:var(--tx)}
+  .card ul{margin:4px 0 6px;padding-left:18px;color:var(--tx2);font-size:13.5px}
+  .lab{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.07em;margin-top:8px}
+  .watch{color:#fca5a5;font-size:13.5px}
+  .ev{color:var(--mut);font-size:12.5px}
+  .ev code{color:var(--a1)}
+  details{margin-top:8px;border-top:1px solid var(--bd);padding-top:6px}
+  summary{cursor:pointer;color:var(--a2);font-size:13px}
+  footer{margin-top:40px;border-top:1px solid var(--bd);padding-top:14px;font-size:13px;color:var(--tx2)}
+  footer li{margin:3px 0}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:.92em}
+</style>
+</head>
+<body>
+<main>
+  <h1>Claude Code: the (model, effort) grid</h1>
+  <p>3 models × 5 effort levels = 15 cells. Each cell states whether the pair is a useful combination, in what way, and what evidence supports that. Click a cell in the overview. Only that cell's card is shown, and the other cells dim.</p>
+  <div class="two">
+    <div class="q"><b>Claude skipped a file, a test, or stopped early?</b> It did not try hard enough. Raise <b>effort</b>.</div>
+    <div class="q"><b>Claude had the context, tried, and was still wrong?</b> It did not know enough. Use a more capable <b>model</b>.</div>
+  </div>
+
+  <h2>Overview</h2>
+  <div id="matrix"></div>
+  <div id="detail"></div>
+  <p style="font-size:13px;color:var(--mut)">
+    <b style="color:#5eead4">Sweet spot</b>: the combination a source names as a default or a first choice for a kind of work.
+    <b style="color:#93c5fd">Useful</b>: a source supports a clear use.
+    <b style="color:#fcd34d">Conditional</b>: works only if a stated condition holds. The card's "Use it when" line states the condition.
+    <b style="color:#94a3b8">Unproven</b>: no source measures it. Only a general rule applies.
+    The verdict is my synthesis of the sources. The evidence line on each card shows what the sources say and what I inferred.<br><b>Evidence labels.</b> <b>Advice in words</b>: the source recommends a setting but gives no test result. <b>Test result</b>: the source reports a measured result, such as 1/5 → 5/5 passes. <b>My inference</b>: no source says it. Letters (A, B, C, D1…D6, S, L, K) link to the source.
+  </p>
+
+  <h2>Effort levels (Anthropic effort page)</h2>
+  <div id="levels" class="cards"></div>
+
+  <h2>From Barty's video</h2>
+  <p>Barty's video <a href="https://www.youtube.com/watch?v=34J2-00SkVk">"Anthropic Just Told Us Which Effort Level Actually Works"</a> shows three graphics that this page cites. I redrew them in SVG from screenshots. They are not the original images. Each caption links the video. The loop text also appears in the blog (<a class="src" href="https://claude.dev/blog/spending-your-effort/" target="_blank" rel="noopener">B</a>).</p>
+  <div class="figs">
+    <figure id="fig-cheat">
+      <svg viewBox="0 0 700 430" role="img" aria-label="Cheat sheet: which effort level, when">
+        <rect width="700" height="430" rx="14" fill="#1e293b"/>
+        <text x="24" y="34" class="fe" fill="#f87171">CHEAT SHEET</text>
+        <text x="24" y="62" class="ft">Which effort level, when</text>
+        <g class="row"><rect x="24" y="78" width="110" height="56" rx="8" fill="#60a5fa"/><text x="79" y="112" class="fl">LOW</text><text x="150" y="102" class="fh">you check every answer</text><text x="150" y="123" class="fs">brainstorms · sketches · small edits · asks more questions</text></g>
+        <g class="row"><rect x="24" y="144" width="110" height="56" rx="8" fill="#4ade80"/><text x="79" y="178" class="fl">MEDIUM</text><text x="150" y="168" class="fh">your everyday default on Opus 5.5</text><text x="150" y="189" class="fs">a new feature with a clear goal</text></g>
+        <g class="row"><rect x="24" y="210" width="110" height="56" rx="8" fill="#facc15"/><text x="79" y="244" class="fl">HIGH</text><text x="150" y="234" class="fh">checking matters</text><text x="150" y="255" class="fs">bugs in existing code · numbers vs a source · final pass</text></g>
+        <g class="row"><rect x="24" y="276" width="110" height="56" rx="8" fill="#fb923c"/><text x="79" y="310" class="fl">XHIGH</text><text x="150" y="300" class="fh">long hand-off work</text><text x="150" y="321" class="fs">over about half an hour</text></g>
+        <g class="row"><rect x="24" y="342" width="652" height="56" rx="8" fill="#3b1d1d" stroke="#f87171"/><rect x="24" y="342" width="110" height="56" rx="8" fill="#f87171"/><text x="79" y="376" class="fl">MAX</text><text x="150" y="366" class="fh">fully on its own</text><text x="150" y="387" class="fs">can overthink: test it before it becomes a habit</text><rect x="470" y="357" width="188" height="26" rx="13" fill="#5b2a2a"/><text x="564" y="375" text-anchor="middle" class="fs" fill="#fca5a5">diminishing returns</text></g>
+      </svg>
+      <figcaption>S. Redrawn from Barty's video, "Which level to use", about <a href="https://www.youtube.com/watch?v=34J2-00SkVk&t=539s">8:59</a>. <a href="https://www.youtube.com/watch?v=34J2-00SkVk">Video</a>.</figcaption>
+    </figure>
+    <figure id="fig-loop">
+      <svg viewBox="0 0 700 430" role="img" aria-label="Feature development loop: interview to spec, build on low, review on low, verify on high">
+        <rect width="700" height="430" rx="14" fill="#1e293b"/>
+        <text x="24" y="34" class="fe" fill="#f87171">THE LOOP</text>
+        <text x="24" y="62" class="ft">A fruitful loop for feature development</text>
+        <g class="step" data-s="0"><rect x="24" y="84" width="652" height="64" rx="10"/><circle cx="62" cy="116" r="17"/><text x="62" y="122" class="fn">1</text><text x="96" y="124" class="fh">Interview → spec</text><text x="300" y="124" class="fs">ask Claude to interview you on missing details</text></g>
+        <g class="step" data-s="1"><rect x="24" y="162" width="652" height="64" rx="10"/><circle cx="62" cy="194" r="17"/><text x="62" y="200" class="fn">2</text><text x="96" y="202" class="fh">Build on low</text><text x="300" y="202" class="fs">implement the spec on low effort</text></g>
+        <g class="step" data-s="2"><rect x="24" y="240" width="652" height="64" rx="10"/><circle cx="62" cy="272" r="17"/><text x="62" y="278" class="fn">3</text><text x="96" y="280" class="fh">Review on low</text><text x="300" y="280" class="fs">check the gist, iterate on low as needed</text></g>
+        <g class="step" data-s="3"><rect x="24" y="318" width="652" height="64" rx="10"/><circle cx="62" cy="350" r="17"/><text x="62" y="356" class="fn">4</text><text x="96" y="358" class="fh">Verify on high</text><text x="300" y="358" class="fs">verify and test on high effort</text></g>
+        <text x="24" y="412" class="fs">Steps 1 to 4 light up in turn.</text>
+      </svg>
+      <figcaption>L. Redrawn from Barty's video, which shows this loop text from the blog (<a class="src" href="https://claude.dev/blog/spending-your-effort/" target="_blank" rel="noopener">B</a>). <a href="https://www.youtube.com/watch?v=34J2-00SkVk">Video</a>.</figcaption>
+    </figure>
+    <figure id="fig-skill">
+      <svg viewBox="0 0 700 430" role="img" aria-label="SKILL.md file with the line effort: low">
+        <rect width="700" height="430" rx="14" fill="#1e293b"/>
+        <text x="24" y="34" class="fe" fill="#f87171">INSIDE A SKILL</text>
+        <text x="24" y="62" class="ft">One line at the top</text>
+        <rect x="24" y="82" width="652" height="270" rx="10" fill="#0f172a" stroke="#334155"/>
+        <rect x="48" y="102" width="36" height="42" rx="3" fill="#e2e8f0"/><rect x="48" y="126" width="36" height="14" fill="#60a5fa"/><text x="66" y="137" text-anchor="middle" class="fs" fill="#0f172a">MD</text>
+        <text x="104" y="130" class="fm" fill="#e2e8f0">SKILL.md</text>
+        <text x="56" y="176" class="fm" fill="#64748b">---</text>
+        <text x="56" y="206" class="fm" fill="#e2e8f0">name: motion-graphics</text>
+        <rect x="46" y="217" width="236" height="32" rx="6" fill="#1e3a5f" stroke="#60a5fa"/><text x="56" y="240" class="fm" fill="#e2e8f0">effort: low</text>
+        <text x="56" y="272" class="fm" fill="#64748b">---</text>
+        <text x="56" y="306" class="fm" fill="#fdba74"># Motion graphics</text>
+        <text x="56" y="332" class="fm" fill="#e2e8f0">Build the scene, then show it…</text>
+        <rect x="24" y="368" width="260" height="36" rx="18" fill="#1e3a5f"/><text x="154" y="392" text-anchor="middle" class="fh" fill="#93c5fd">runs on low, every time</text>
+      </svg>
+      <figcaption>K. Redrawn from Barty's video. The frontmatter field <code>effort</code> sets the effort while the skill runs (also in <a class="src" href="https://academy.claude.com/tutorials/choosing-the-right-effort-level-in-claude-code" target="_blank" rel="noopener">C</a>). <a href="https://www.youtube.com/watch?v=34J2-00SkVk">Video</a>.</figcaption>
+    </figure>
+  </div>
+
+
+  <footer>
+    <h2 style="margin-top:0">Sources</h2>
+    <p><b>Articles and video.</b></p>
+    <ul>
+      <li><code>B</code> <a href="https://claude.dev/blog/spending-your-effort/">Using Claude Code: Spending your effort</a> (claude.dev). Terminal-Bench 3.0 runs, 5 attempts per task, Anthropic internal runs. The same text is on <a href="https://x.com/trq212/article/2103576349499855160">X</a>.</li>
+      <li><code>A</code> <a href="https://claude.com/resources/articles/claude-model-and-effort-level-in-claude-code">Choosing a Claude model and effort level in Claude Code</a>, Lydia Hallie, 2026-07-07.</li>
+      <li><code>C</code> <a href="https://academy.claude.com/tutorials/choosing-the-right-effort-level-in-claude-code">Claude Academy: Choosing the right effort level in Claude Code</a>.</li>
+      <li><code>S</code> <code>L</code> <code>K</code> Barty, <a href="https://www.youtube.com/watch?v=34J2-00SkVk">"Anthropic Just Told Us Which Effort Level Actually Works"</a> (YouTube). The cheat sheet (S), the loop (L), and the skill file (K) are redrawn from screenshots of this video in the section "From Barty's video".</li>
+    </ul>
+    <p><b>Official Anthropic documentation (fetched 2026-10-30).</b></p>
+    <ul>
+      <li><code>D1</code> <a href="https://code.claude.com/docs/en/model-config">Claude Code: Model configuration</a>. Part of the page text reached me as a fetch summary, so the per-level wording is not verified word for word.</li>
+      <li><code>D2</code> <a href="https://platform.claude.com/docs/en/build-with-claude/effort">Effort parameter</a>.</li>
+      <li><code>D3</code> <a href="https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence">Optimizing for cost and intelligence</a>. Part of this page also reached me as a summary.</li>
+      <li><code>D4</code> <a href="https://www.anthropic.com/claude-sonnet-5-5">Introducing Claude Sonnet 5.5</a>.</li>
+      <li><code>D5</code> <a href="https://platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5">What's new in Claude Opus 5.5</a> and <a href="https://platform.claude.com/docs/en/models/opus-5-5/overview">Opus 5.5 overview</a> (also the Fable 5.1 row of the model table).</li>
+      <li><code>D6</code> <a href="https://www.anthropic.com/claude/fable">Claude Fable 5.1</a>.</li>
+    </ul>
+    <p><b>Limits.</b> Sources give no effort guidance for Sonnet 5.5 beyond D1, D2 and D4. Where a Sonnet cell has no measurement, the card says so. The sources give no token count per effort level. The effort scale is calibrated per model, so the same level name is a different amount of work on each model (D1, C). When you change model, start again at its default effort.</p>
+  </footer>
+</main>
+
+<script>
+const EFF=[
+ {k:'low',c:'#60a5fa',d:'Most efficient. Significant token savings with some capability reduction. Fewer and terser tool calls; can skip thinking.',t:'Simpler tasks that need the best speed and lowest cost, such as subagents (D2). Quick exchanges where you review each result (D1).'},
+ {k:'medium',c:'#4ade80',d:'Balanced approach with moderate token savings.',t:'Day-to-day work with a clear scope, such as a new feature (D1). Default on Opus 5.5 and Sonnet 5.5 in Claude Code (D1, D4). On long coding tasks medium cost 30% to 52% less than high (D3).'},
+ {k:'high',c:'#facc15',d:'Spends as many tokens as the task needs for excellent results. Default on most models.',t:'Work where verification matters or edge cases are likely, such as a bug in an existing codebase (D1). Default on Fable 5.1 (D2).'},
+ {k:'xhigh',c:'#fb923c',d:'Extended capability for long-horizon work.',t:'Long-running agentic and coding tasks over 30 minutes (D2). Cheat sheet: long hand-off work (S).'},
+ {k:'max',c:'#f87171',d:'Absolute maximum capability with no constraints on token spending.',t:'Hard problems you want solved without you, such as finding security vulnerabilities. May show diminishing returns and overthink. Test before adopting. Session-only unless set by CLAUDE_CODE_EFFORT_LEVEL (D1).'}
+];
+const M=[
+ {k:'fable',n:'Fable 5.1',
+  facts:'$10 in / $50 out per million tokens. 1M context. Slower. Default effort high. Best for ambitious, long-running, asynchronous work (D6). Not the default model on any plan. Can bill to usage credits (D1). Needs 30-day data retention. Some cyber and biology requests are routed to less capable models, billed below Fable prices (D6).',
+  cells:[
+  {v:'situ',use:'A hard problem that needs recognition, not long checking.',
+   when:'The problem needs a known pattern, not long checking, and a less capable model already failed with full context.',
+   how:['The article (A) says Fable at low is a specialist who glances at the problem everyone else is stuck on and still sees what others miss.','Fable finished jobs that Opus and Sonnet could not finish at any effort level (A).'],
+   eg:['A bug that other models keep misdiagnosing with full context','Choosing between architectures in an unfamiliar domain'],
+   watch:'Not for edge-case-heavy work: the HTML sanitizer task scored 1/5 at low (B). Not for routine work: $10/$50 per million tokens buys capability the task does not need (A).',
+   ev:'Advice in words: <code>A</code>. Test result: <code>B</code> reports 1/5 on the HTML sanitizer task at low, a case against low. In the pooled <code>B</code> figures, "low" means the two lowest settings.'},
+  {v:'unp',use:'Cost trim on routine Fable work, after your own evals.',
+   how:['D2: start at high, then step down to medium or low "for routine or latency-sensitive work once your evals show quality holds".','Medium vs high on long coding tasks: 30% to 52% lower cost, up to 15 points lower quality, depending on the task (D3, all models).'],
+   eg:['A long-running Fable pipeline whose outputs you can check automatically'],
+   watch:'No source measures Fable at medium. Run your own evals before relying on it.',
+   ev:'Advice in words: <code>D2</code>, <code>D3</code> give a general rule for stepping down. No source tested Fable 5.1 at medium.'},
+  {v:'sweet',use:'The Fable default. Demanding reasoning and long-horizon agentic work.',
+   how:['D2: "Start with high, the default."','D3: use Fable 5.1 for demanding reasoning and long-horizon agentic work, or when Opus 5.5 at higher effort still falls short.','Set a large <code>max_tokens</code> at high and above: it is a hard limit on thinking plus response (D2).'],
+   eg:['Multi-file refactor with design decisions','Debugging a failure that Opus 5.5 at xhigh did not fix'],
+   watch:'Changing the model or effort mid-session changes what you pay per token and per task. Check usage credits (D1).',
+   ev:'Advice in words: <code>D2</code>, <code>D3</code>, <code>D6</code>. This card cites no test result.'},
+  {v:'sweet',use:'Edge-case-heavy hard problems that must be right.',
+   how:['HTML sanitizer that strips every JavaScript smuggling route: Fable 5.1 scored 1/5 at low and 5/5 at xhigh. A low attempt took about 2 minutes. The xhigh run took about 33 minutes: it reviewed its draft, read the parser source, ran an XSS suite, wrote a fuzzer (B).','Long-horizon work over 30 minutes (D2, S).'],
+   eg:['Security-sensitive parsers and sanitizers','Performance optimization with production requirements (B)'],
+   watch:'The model sets how much it knows; xhigh adds checking, not knowledge. At 33 minutes per attempt, check that the task justifies the wait.',
+   ev:'Test result: <code>B</code> reports 1/5 at low and 5/5 at xhigh on the HTML sanitizer task. That is one task, not a benchmark. Advice in words: <code>D2</code>, <code>S</code>.'},
+  {v:'situ',use:'Hardest autonomous work: security hunts and hardware.',
+   when:'You will not watch the run, a wrong result costs more than the token spend, and a trial shows max beating xhigh on your task.',
+   how:['Fable 5.1 pass rate, low to top effort (xhigh and max pooled): security 64% → 87%, hardware 34% → 75%, ML 54% → 73%, science 41% → 61% (B).','Blog rule of thumb: max for finding security vulnerabilities in critical software (B). D1 gives the same example.'],
+   eg:['Vulnerability search in critical software','Verilog or FPGA design that must meet a spec'],
+   watch:'Highest-cost cell: $10/$50 per million tokens with no cap on token spending (D2). May overthink; test before making it a habit (D1, S). Max is session-only (D1). Fable safeguards route some security requests to less capable models (B footnote, D6).',
+   ev:'Test result: <code>B</code> gives pass rates for xhigh and max pooled together. It does not isolate max. Advice in words: <code>D1</code>, <code>D2</code>, <code>S</code>.'}
+ ]},
+ {k:'opus',n:'Opus 5.5',
+  facts:'$4 in / $20 out per million tokens: 2 times the Sonnet 5.5 price, 0.4 times the Fable 5.1 price. 1M context. Thinking is always on. Default effort medium (D1, D5). Built for long-running agentic coding and knowledge work (D5).',
+  cells:[
+  {v:'useful',use:'Quick, in-the-loop work where you review each result.',
+   how:['The article (A) says Opus at low is five minutes with an expert. It brings patterns and gotchas from similar problems, but reads your code quickly, not carefully.','The /config redesign took 1 minute at low and gave a sketch that conveyed the idea. At max it took 28 minutes and looked like Claude Code (B).','Loop steps 2 and 3: implement the spec on low, review the gist on low (B, L).','A skill with <code>effort: low</code> runs on low every time (K).'],
+   eg:['Brainstorming, sketches, small edits (S, D1)','Implementing a spec you will review','Skills and subagent tasks you can check quickly'],
+   watch:'Low edited code before building or running the reproducer, and did not check that its new test would catch the bug: storage-engine task 0/5 at low (B). Stopping early is the sign the effort is too low (C).',
+   ev:'Advice in words: <code>S</code>, <code>D1</code>, <code>D2</code>, <code>A</code>. Test result: <code>B</code> reports 0/5 at low on the storage-engine task, a case against low.'},
+  {v:'sweet',use:'The everyday default. A new feature with a clear goal.',
+   how:['Cheat sheet: medium is "your everyday default on Opus 5.5" (S). D1 and D5 confirm the default.','D3: for most agent workloads, start with Opus 5.5 at medium.','Moving from Opus 5 to Opus 5.5: start at medium, not at the level you used before (D1).'],
+   eg:['Implement a feature from a clear description','Well-scoped refactor','Writing tests for existing code'],
+   watch:'Medium makes fewer checks than high. On a task you cannot verify yourself, step up one level (C).',
+   ev:'Advice in words: <code>S</code>, <code>D1</code>, <code>D3</code>, <code>D5</code> name medium as the default. This card cites no test result.'},
+  {v:'sweet',use:'Verification and edge cases. Bugs in existing code, final passes, loop step 4.',
+   how:['Cheat sheet: high = "checking matters: bugs in existing code, numbers vs a source, final pass" (S). D1: high for verification and likely edge cases.','Blog loop step 4: "Verify and test on high effort" (B, L).','Linear-program solver CLI: 0/5 at low, 5/5 at high. Low tested a few small cases and stopped near 10k tokens. High tested against a brute-force solver and timed big inputs (B).','Gene-set enrichment on proteomics data: 0/5 at low, 4/5 at high. High tried two data-prep methods and traced why the result changed. With no user to ask, high does better (B).'],
+   eg:['Bug in a brownfield codebase','Check numbers against a source','Review before merge'],
+   watch:'Effort cannot fix a wrong approach. Terminal-Bench failures from wrong approach did not fall with more effort (B).',
+   ev:'Test result: <code>B</code> reports 0/5 at low and 5/5 at high on the linear-program solver, and 0/5 and 4/5 on the gene-set task. That is two tasks, not a benchmark. Advice in words: <code>D1</code>, <code>S</code>.'},
+  {v:'useful',use:'Long hand-off work over about 30 minutes.',
+   how:['D2: xhigh for long-running agentic and coding tasks over 30 minutes. Cheat sheet: "long hand-off work, over about half an hour" (S).','Storage-engine bug from a crash report: 0/5 at low (about 1 minute), 4/5 at xhigh (about 11 minutes). It reproduced the crash first, wrote a randomized test against a reference that never compacts, and checked that its tests fail on half-finished fixes (B).','Opus 5.5 thinks more per turn at a given level, most of all at xhigh and max (D5). Leave room in <code>max_tokens</code> for thinking.'],
+   eg:['Overnight migration with a test suite','Crash-report fix without breaking other behavior'],
+   watch:'Costs more tokens per turn than Opus 4.7 at the same level name (D5). The scale is calibrated per model.',
+   ev:'Test result: <code>B</code> reports 0/5 at low and 4/5 at xhigh on the storage-engine task. That is one task. Advice in words: <code>D2</code>, <code>S</code>, <code>D5</code>. <code>D1</code> says ultracode runs at xhigh.'},
+  {v:'situ',use:'Fully autonomous work, or the best one-shot of a vague request.',
+   when:'No user is in the loop, you want the best single attempt, and a trial shows max beating xhigh on your task.',
+   how:['Cheat sheet: max = "fully on its own" (S). Blog: max for end-to-end building and verification of an app (B).','A vague fitness-tracker prompt gives a log and a graph at low and a heat chart at max. "Max effort would be if I wanted Claude\'s best one shot" (B).'],
+   eg:['End-to-end app build plus verification','Hard problem you will not watch'],
+   watch:'Diminishing returns and overthinking: the cheat sheet says "test it before it becomes a habit" (S, D1). Max makes more choices for you (B). Session-only unless set by CLAUDE_CODE_EFFORT_LEVEL (D1). The sources show max can score below xhigh: Sonnet 5.5 did so on one benchmark (D4). The same check applies to Opus: compare max with xhigh on your task.',
+   ev:'Advice in words: <code>S</code>, <code>B</code>, <code>D1</code>, <code>D2</code>. The 28-minute run in <code>B</code> is one example, not a test with pass rates.'}
+ ]},
+ {k:'sonnet',n:'Sonnet 5.5',
+  facts:'$2 in / $10 out per million tokens. 1M context. Faster, lower cost than Opus 5.5. Strongest at well-scoped everyday tasks, bug fixes, and polished documents, slides and spreadsheets (D4). Default effort: medium in Claude Code and the apps, high on the Claude Platform API (D4). Opus 5.5 stays clearly stronger at complex, open-ended work that needs sustained judgment (D4).',
+  cells:[
+  {v:'useful',use:'Routine work you can describe exactly.',
+   how:['D4: Low or Medium "complements Opus 5.5 best".','The article (A): edits you can describe precisely, mechanical changes, and questions about code already in context suit a smaller model.','D2: low for simpler tasks that need the best speed and lowest cost, such as subagents.','D3: when outputs are checkable, run at low and re-run failures at high. This costs about 40% less than everything at high at the same pass rate.'],
+   eg:['Rename a symbol, reformat, write a docstring','Question about code already in context','Subagent that searches or summarizes'],
+   watch:'Low hands back sooner and asks you for context instead of working it out (A). Any task with hidden edge cases fails here.',
+   ev:'Advice in words: <code>A</code>, <code>D2</code>, <code>D3</code>, <code>D4</code>. No source tested Sonnet 5.5 at low.'},
+  {v:'sweet',use:'The Sonnet default in Claude Code. Daily coding with a clear scope.',
+   how:['D4: in Claude Code the default is medium. At medium, Sonnet 5.5 "far exceeds Sonnet 5\'s best score for less than a tenth of the cost per task" on Terminal-Bench 4.0.','D1: the <code>sonnet</code> alias is for daily coding tasks. D2: for agentic coding start at medium for well-specified tasks.','The <code>opusplan</code> alias plans on Opus and executes on Sonnet (D1).'],
+   eg:['Well-scoped bug fix','Feature from a clear spec','Slides, documents, spreadsheets (D4)'],
+   watch:'Sonnet is a generalist. It lacks "I have seen exactly this before" recognition (A). If it is confidently wrong with full context, change the model, not the effort.',
+   ev:'Advice in words: <code>D1</code>, <code>D2</code>, <code>A</code>. Test result: <code>D4</code> reports a Terminal-Bench 4.0 score for Sonnet 5.5 at medium. Anthropic ran that test, not an outside party.'},
+  {v:'useful',use:'A well-understood task that needs checking.',
+   how:['The article (A): Sonnet at high is a good generalist given the whole afternoon. It reads everything, runs things, double-checks, and learns your code well.','D2: Sonnet 5.5 on the API: start with high unless the workload is agentic or latency-sensitive.','Blog loop step 4 (verify on high) applies to any model (B, L).'],
+   eg:['Bug fix in code the model can fully read','Verification pass on work built at low or medium','Cost-conscious review'],
+   watch:'High does not add knowledge (C). If the bug needs an uncommon library\'s rules, a larger model fixes it, high effort only reads more.',
+   ev:'Advice in words: <code>A</code>, <code>D2</code>, <code>D1</code>. No source tested Sonnet 5.5 at high. <code>B</code> has the only tests with numbers, and they cover other models.'},
+  {v:'situ',use:'Long, well-specified runs where Sonnet price matters.',
+   when:'The task is well specified, runs over 30 minutes, and needs no uncommon domain knowledge that Sonnet may lack.',
+   how:['D2: xhigh for long-running tasks over 30 minutes.','D4 footnote: on FrontierCode, Sonnet 5.5 scored lower at max than at xhigh. At max it ran code-review subagents, which led to timeouts or out-of-scope edits. That makes xhigh the better top setting for Sonnet there.'],
+   eg:['Long migration with clear tests','Batch of similar well-specified changes'],
+   watch:'No source measures Sonnet at xhigh for general coding. The case rests on D2 and the D4 footnote. For open-ended work needing sustained judgment, use Opus 5.5 (D4).',
+   ev:'Advice in words: <code>D2</code>. Test result: the <code>D4</code> footnote reports Sonnet 5.5 scoring higher at xhigh than at max on FrontierCode. That is one benchmark. The rest of the case is my inference.'},
+  {v:'situ',use:'Try only when you want Opus-like results at Sonnet price.',
+   when:'A trial on your own tasks shows Sonnet at max matching Opus at medium for a lower total cost per finished task.',
+   how:['D4: on several evaluations, Sonnet 5.5 at max performs comparably to Opus 5.5.','D4 footnote: not better on every task. It scored lower at max than at xhigh on FrontierCode.','D1: max can overthink. Test before adopting it broadly.'],
+   eg:['A benchmark of your own tasks: Sonnet max against Opus medium'],
+   watch:'Opus 5.5 at medium costs 2 times more per token but may need fewer tokens. Compare cost per finished task, not cost per token (D3, A). Max is session-only (D1).',
+   ev:'Advice in words: <code>D1</code>. Test result: <code>D4</code> reports Sonnet 5.5 at max comparable to Opus 5.5 on several evaluations. Anthropic ran them. No source tested your tasks.'}
+ ]}
+];
+const LBL={sweet:'Sweet spot',useful:'Useful',situ:'Conditional',unp:'Unproven'};
+// every source label links to its source; S, L, K link to the redrawn figures, whose captions link to the video
+const VID='https://www.youtube.com/watch?v=34J2-00SkVk';
+const SRC={
+ A:['https://claude.com/resources/articles/claude-model-and-effort-level-in-claude-code','Article: Choosing a Claude model and effort level in Claude Code (L. Hallie, 2026-07-07)'],
+ B:['https://claude.dev/blog/spending-your-effort/','Blog: Using Claude Code: Spending your effort (claude.dev)'],
+ C:['https://academy.claude.com/tutorials/choosing-the-right-effort-level-in-claude-code','Claude Academy: Choosing the right effort level in Claude Code'],
+ D1:['https://code.claude.com/docs/en/model-config','Claude Code docs: Model configuration'],
+ D2:['https://platform.claude.com/docs/en/build-with-claude/effort','Claude Platform docs: Effort'],
+ D3:['https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence','Claude Platform docs: Optimizing for cost and intelligence'],
+ D4:['https://www.anthropic.com/claude-sonnet-5-5','Introducing Claude Sonnet 5.5'],
+ D5:['https://platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5','What\'s new in Claude Opus 5.5'],
+ D6:['https://www.anthropic.com/claude/fable','Claude Fable 5.1'],
+ S:['#fig-cheat','Cheat sheet from Barty\'s video (redrawn below)'],
+ L:['#fig-loop','Feature-development loop from Barty\'s video (redrawn below)'],
+ K:['#fig-skill','Skill with effort: low, from Barty\'s video (redrawn below)']
+};
+const T='(?:D[1-6]|[ABCKLS])', TF=T+'(?: footnote)?';
+const anc=(k,txt)=>{const [u,t]=SRC[k],ext=u[0]!=='#';return `<a class="src" href="${u}" title="${t.replace(/"/g,'&quot;')}"${ext?' target="_blank" rel="noopener"':''}>${txt}</a>`};
+function lk(s){
+  s=s.replace(new RegExp('<code>('+T+')</code>','g'),(m,k)=>anc(k,`<code>${k}</code>`));
+  s=s.replace(new RegExp('\\(('+TF+'(?:, '+TF+')*)\\)','g'),(m,inner)=>'('+inner.replace(new RegExp(TF,'g'),t=>anc(t.split(' ')[0],t))+')');
+  return s.split(/(<a\b[^>]*>.*?<\/a>)/g).map(p=>p.startsWith('<a ')?p:p.replace(/\bD[1-6]\b/g,k=>anc(k,k))).join('');
+}
+const id=(m,e)=>`c-${m}-${e}`;
+// matrix
+let h='<table><tr><th></th>'+EFF.map(e=>`<th style="color:${e.c}">${e.k}</th>`).join('')+'</tr>';
+M.forEach(m=>{
+  h+=`<tr><th class="rowh">${m.n}<small>${m.facts.match(/^.*?tokens/)[0]}</small></th>`;
+  m.cells.forEach((c,i)=>h+=`<td><a class="v-${c.v}" href="#${id(m.k,i)}"><b>${LBL[c.v]}</b><span>${c.use}</span></a></td>`);
+  h+='</tr>';
+});
+document.getElementById('matrix').innerHTML=h+'</table>';
+// levels
+document.getElementById('levels').innerHTML=EFF.map(e=>`<div class="card" style="--c:${e.c}"><h4><span class="e">${e.k}</span></h4><div class="use" style="font-weight:400">${e.d}</div><div class="lab">Use for</div><div class="ev" style="color:var(--tx2)">${lk(e.t)}</div></div>`).join('');
+// one detail card, shown for the selected cell only
+const det=document.getElementById('detail'), mat=document.getElementById('matrix');
+const HINT='<div class="hint">Click a cell above. Its explanation appears here.</div>';
+function select(k,i,scroll){
+  const m=M.find(x=>x.k===k), c=m&&m.cells[i];
+  mat.querySelectorAll('a').forEach(a=>a.classList.toggle('sel',a.getAttribute('href')==='#'+id(k,i)));
+  mat.classList.toggle('has-sel',!!c);
+  if(!c){det.innerHTML=HINT;return}
+  det.innerHTML=`<p class="mf"><b>${m.n}:</b> ${lk(m.facts)}</p>
+<article class="card" style="--c:${EFF[i].c}">
+ <h4><span><span class="e">${EFF[i].k}</span> · ${m.n}</span><span class="badge v-${c.v}">${LBL[c.v]}</span></h4>
+ <div class="use">${c.use}</div>
+ ${c.when?`<div class="when"><b>Use it when:</b> ${c.when}</div>`:''}
+ <div class="lab">How it is useful</div><ul>${c.how.map(x=>`<li>${lk(x)}</li>`).join('')}</ul>
+ <div class="lab">Example tasks</div><ul>${c.eg.map(x=>`<li>${lk(x)}</li>`).join('')}</ul>
+ <div class="lab">Watch for</div><div class="watch">${lk(c.watch)}</div>
+ <div class="lab">Evidence</div><div class="ev">${lk(c.ev)}</div>
+</article><button id="clr">Clear selection</button>`;
+  document.getElementById('clr').onclick=()=>{history.replaceState(null,'','#');select()};
+  if(scroll)det.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+mat.addEventListener('click',ev=>{
+  const a=ev.target.closest('a');if(!a)return;ev.preventDefault();
+  const [,k,i]=a.getAttribute('href').slice(1).split('-');
+  history.replaceState(null,'','#'+id(k,i));select(k,+i,true);
+});
+// loop figure: light steps 1 to 4 in turn. With reduced motion, light all steps and stop.
+const steps=[...document.querySelectorAll('.step')];
+if(matchMedia('(prefers-reduced-motion: reduce)').matches)steps.forEach(s=>s.classList.add('on'));
+else{let n=0;const tick=()=>{steps.forEach((s,i)=>s.classList.toggle('on',i===n));n=(n+1)%steps.length};tick();setInterval(tick,1600)}
+const hm=location.hash.match(/^#c-(\w+)-(\d)$/);
+hm?select(hm[1],+hm[2],true):select();
+</script>
+</body>
+</html>
